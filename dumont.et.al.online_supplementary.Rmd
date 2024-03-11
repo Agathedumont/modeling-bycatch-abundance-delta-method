@@ -1,0 +1,899 @@
+---
+title: 'Online supplementary materials for "Modeling bycatch in the Indian Ocean French tropical tuna purse seine fishery on floating objects using the $\Delta$ method"'
+author: "Agathe Dumont, Philippe Sabarros, Antoine Duparc, David M. Kaplan"
+date: "`r Sys.Date()`"
+output: 
+  bookdown::pdf_document2:
+    keep_tex: FALSE
+    toc: TRUE
+linkcolor: blue
+urlcolor: blue
+citecolor: blue
+header-includes: 
+  - \usepackage{booktabs}
+  - \usepackage[nomarkers,tablesfirst]{endfloat}
+---
+
+\renewcommand\thefigure{S\arabic{figure}}
+\renewcommand\thetable{S\arabic{table}}
+
+# Overview
+
+This document provides additional results, tables and figures in support of the publication.
+It begins with the versions of R and R packages used to run the models, followed by standard summary outputs from the models run in the paper, and
+by supplementary tables and supplementary figures. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(randomForest)
+library(mgcv)
+library(mgcViz)
+
+params = readRDS("output_data/base_parameters.RDS")
+attach(params)
+
+sp = "silkyshark"
+SP = tolower(crit_species[sp])
+
+load("output_data/critical_functions.RData")
+```
+
+```{r load_data_for_models}
+ecd_ind_fob_env = readRDS("output_data/ecd_wide_obs_io_fr_catch_sets_data.fob_final.2010-2018.RDS")
+data_for_models = readRDS("output_data/final.data_for_models.post-rev.RDS")
+
+data_for_models_obs = data_for_models |> filter(observer)
+data_for_models_noobs = data_for_models |> filter(!observer)
+
+minyr = min(data_for_models$year)
+maxyr = max(data_for_models$year)
+```
+
+# Versions of software used to run models
+
+```{r software_versions, echo=TRUE}
+R.version
+
+package.list = c("base","tidyverse","dplyr","tibble","mgcv","randomForest",
+                 "VSURF","knitrdata","rmarkdown","knitr",
+                 "mgcViz","lubridate","ncdf4","foreach","doParallel",
+                 "ggplot2","starticles","kableExtra") |> sort()
+
+sapply(package.list, \(pn) {
+  packageDescription(pn,fields=c("Package","Version"))
+}) |> t() |> as.data.frame()
+
+sessionInfo()
+```
+
+
+# Summary outputs from models
+
+## Presence-absence GAMs
+
+```{r print_pres_abs_gam_summaries}
+fns = c(f=".full",fnv=".full_no_vessel",o=".optimal",onv=".opt_no_vessel",nvo=".no_vessel_opt")
+fnst = c(f="Full",fnv="Full w/o vessel",o="Optimal",onv="Opt. w/o vessel",nvo="No vessel opt.")
+for (ss in names(crit_species)) {
+  for (nn in names(fns)) {
+    fn = paste0("output_data/gam_pres.abs.",ss,fns[nn],".RDS")
+    m = readRDS(fn)
+    
+    cat("#########################################################\n")
+    cat(paste0("### ",crit_species[ss],", ",fnst[nn]," pres.-abs. GAM ###\n"))
+    cat(paste0("### Filename: ",basename(fn)," ###\n"))
+    cat("#########################################################\n")
+    print(summary(m$model))
+    cat("\n\n")
+  }
+}
+```
+
+## Presence-absence RF models
+
+```{r print_pres_abs_rf_summaries}
+fns = c(f=".full",fnv=".full_no_vessel",o=".optimal",onv=".opt_no_vessel",nvo=".no_vessel_opt")
+fnst = c(f="Full",fnv="Full w/o vessel",o="Optimal",onv="Opt. w/o vessel",nvo="No vessel opt.")
+for (ss in names(crit_species)) {
+  for (nn in names(fns)) {
+    fn = paste0("output_data/rf_pres.abs.",ss,fns[nn],".RDS")
+    m = readRDS(fn)
+    
+    cat("#########################################################\n")
+    cat(paste0("### ",crit_species[ss],", ",fnst[nn]," pres.-abs. RF model ###\n"))
+    cat(paste0("### Filename: ",basename(fn)," ###\n"))
+    cat("#########################################################\n")
+    print(m$model)
+    cat("\n\n")
+  }
+}
+```
+
+## Abundance when present GAMs
+
+```{r print_abund_summaries}
+fns = c(f=".full",fnv=".full_no_vessel",o=".optimal",onv=".opt_no_vessel",nvo=".no_vessel_opt")
+fnst = c(f="Full",fnv="Full w/o vessel",o="Optimal",onv="Opt. w/o vessel",nvo="No vessel opt.")
+for (ss in names(crit_species)) {
+  for (nn in names(fns)) {
+    for (ff in names(gam_abund_families)) {
+      fn = paste0("output_data/gam_abund.",ss,".",ff,fns[nn],".RDS")
+      
+      # Only print out if file exists and either full model or model of chosen family
+      if (file.exists(fn) & (nn=="f" | ff == chosen_gam_abund_family)) {
+        m = readRDS(fn)
+        
+        cat("#########################################################\n")
+        cat(paste0("### ",crit_species[ss],", ",fnst[nn]," ",gam_abund_families[ff]," abundance when present GAM ###\n"))
+        cat(paste0("### Filename: ",basename(fn)," ###\n"))
+        cat("#########################################################\n")
+        print(summary(m$model))
+        cat("\n\n")
+      }
+    }
+  }
+}
+```
+
+
+# Supplementary tables and figures
+
+```{r prep_for_effect_plots}
+dstats = data_for_models_obs |> select(catch,MLD,NPP,SST,SSS) |> group_by() |>
+  summarize(across(everything(),list(ll=~quantile(.x,0.025),ul=~quantile(.x,0.975),Mean=mean))) |>
+  pivot_longer(cols=everything(),names_to=c("Abbreviation","fn"),names_pattern="(.*)_(.*)",
+               values_to="val") |>
+  pivot_wider(names_from="fn",values_from="val") |>
+  mutate(Mean = format(round(Mean,2),nsmall=2),
+         `95% interval`=paste0("[",format(round(ll,2),nsmall=2),"; ",
+                               format(round(ul,2),nsmall=2),"]")) |>
+  select(Abbreviation,`95% interval`,Mean,ll,ul)
+
+
+gam_pres.abs_mods = lapply(setNames(names(crit_species),names(crit_species)),
+                           \(sp) readRDS(paste0("output_data/gam_pres.abs.",sp,".optimal.RDS")))
+
+res = lapply(gam_pres.abs_mods,\(m){
+  gv=getViz(m$model) 
+  preds = m$preds
+  
+  # This code assumes that getViz output does not have outputs for direct terms
+  # I have not tested if this is always true
+  ot = names(preds)
+  tt = ot[grepl("(s|ti|te)[(]",ot)]
+
+  ii = ifelse(grepl("quarter",tt),4,1) |> cumsum()
+  jj = grepl("(lon|lat)",tt)
+  
+  tt = tt[!jj]
+  ii = ii[!jj]
+  
+  TT = paste0("(",letters[seq_along(tt)],")")
+  ft = tt
+  
+  FT = paste(TT,ft,collapse="; ")
+  
+  nrow = ceiling(length(tt)/3)
+  
+  return(list(model=m$model,gv=gv,preds=preds,ot=ot,tt=tt,TT=TT,ft=ft,FT=FT,nrow=nrow,ii=ii))
+})
+```
+
+(ref:figpresabsgameffect2) Marginal effect of non-spatial predictors with smooths on the
+presence of `r tolower(crit_species[names(res)[2]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for presence-absence and are listed in the following order:
+`r res[[2]]$FT`. The horizontal red lines represent
+the central 95% of the distribution of the corresponding predictor
+variable.
+
+```{r figpresabsgameffect2, fig.cap="(ref:figpresabsgameffect2)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10/3*res[[2]]$nrow}
+rr = res[[2]]
+RR = lapply(seq_along(rr$tt), \(.) my_plot_gam_viz(rr$gv,rr$ii[.],rr$tt[.],rr$TT[.],fill_guide=TRUE))
+
+do.call(gridPrint,c(RR,ncol=3))
+```
+
+
+(ref:figpresabsgameffect3) Marginal effect of non-spatial predictors with smooths on the
+presence of `r tolower(crit_species[names(res)[3]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for presence-absence and are listed in the following order:
+`r res[[3]]$FT`. The horizontal red lines represent
+the central 95% of the distribution of the corresponding predictor
+variable.
+
+```{r figpresabsgameffect3, fig.cap="(ref:figpresabsgameffect3)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10/3*res[[3]]$nrow}
+rr = res[[3]]
+RR = lapply(seq_along(rr$tt), \(.) my_plot_gam_viz(rr$gv,rr$ii[.],rr$tt[.],rr$TT[.],fill_guide=TRUE))
+
+do.call(gridPrint,c(RR,ncol=3))
+```
+
+
+(ref:figpresabsgameffect4) Marginal effect of non-spatial predictors with smooths on the
+presence of `r tolower(crit_species[names(res)[4]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for presence-absence and are listed in the following order:
+`r res[[4]]$FT`. The horizontal red lines represent
+the central 95% of the distribution of the corresponding predictor
+variable.
+
+```{r figpresabsgameffect4, fig.cap="(ref:figpresabsgameffect4)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10/3*res[[4]]$nrow}
+rr = res[[4]]
+RR = lapply(seq_along(rr$tt), \(.) my_plot_gam_viz(rr$gv,rr$ii[.],rr$tt[.],rr$TT[.],fill_guide=TRUE))
+
+do.call(gridPrint,c(RR,ncol=3))
+```
+
+
+
+(ref:figpresabsgamlonlateffect2) Marginal effects of spatial predictors by quarter on the
+presence of `r tolower(crit_species[names(res)[2]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for presence-absence using the `mgcv::vis.gam` function
+with all predictors other than lon, lat, quarter and month fixed at their median values.
+Month was set to be the central month of the corresponding quarter (e.g., for quarter 1, month was set to 2). 
+
+```{r figpresabsgamlonlateffect2, fig.cap="(ref:figpresabsgamlonlateffect2)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+rr = res[[2]]
+
+op = par(mfrow=c(2,2))
+
+for (q in 1:4){
+  my_plot_gam_geo_quarter(rr$model,quarter=q,main=paste0("(",letters[q],") Quarter ",q))
+}
+
+par(op)
+```
+
+
+(ref:figpresabsgamlonlateffect3) Marginal effects of spatial predictors by quarter on the
+presence of `r tolower(crit_species[names(res)[3]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for presence-absence using the `mgcv::vis.gam` function
+with all predictors other than lon, lat, quarter and month fixed at their median values.
+Month was set to be the central month of the corresponding quarter (e.g., for quarter 1, month was set to 2). 
+
+```{r figpresabsgamlonlateffect3, fig.cap="(ref:figpresabsgamlonlateffect2)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+rr = res[[3]]
+
+op = par(mfrow=c(2,2))
+
+for (q in 1:4){
+  my_plot_gam_geo_quarter(rr$model,quarter=q,main=paste0("(",letters[q],") Quarter ",q))
+}
+
+par(op)
+```
+
+
+(ref:figpresabsgamlonlateffect4) Marginal effects of spatial predictors by quarter on the
+presence of `r tolower(crit_species[names(res)[4]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for presence-absence using the `mgcv::vis.gam` function
+with all predictors other than lon, lat, quarter and month fixed at their median values.
+Month was set to be the central month of the corresponding quarter (e.g., for quarter 1, month was set to 2). 
+
+```{r figpresabsgamlonlateffect4, fig.cap="(ref:figpresabsgamlonlateffect4)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+rr = res[[4]]
+
+op = par(mfrow=c(2,2))
+
+for (q in 1:4){
+  my_plot_gam_geo_quarter(rr$model,quarter=q,main=paste0("(",letters[q],") Quarter ",q))
+}
+
+par(op)
+```
+
+
+
+(ref:gammodelstats) Performance statistics for the full and optimal presence-absence GAMs of the four species considered in this study. Models that are indicated as "full w/o vessel" and "opt. w/o vessel" were simply the same as the full and optimal models, respectively, with the predictor "vessel" removed, whereas "no vessel opt." models were optimized excluding the predictor "vessel" from the start. Statistics preceded with "v-" (e.g., v-RMSE, v-MAE)
+were computed as the average over results from `r nfolds`-fold cross-validation. The "Dev. expl. (%)" column reports the deviance explained found in the summary output of the GAM model itself, and not the deviance explained calculated using Eq. (1) that is reported for abundance when present and $\Delta$ models.
+
+```{r gammodelstats}
+fnb = "output_data/gam_pres.abs."
+
+gam_pres.abs_stats = lapply(names(crit_species), \(sp) {
+  fns = c(".full",".full_no_vessel",".optimal",".opt_no_vessel",".no_vessel_opt")
+  fns = paste0(fnb,sp,fns,".RDS")
+
+  r = lapply(fns,\(.) model_results(readRDS(.))) |> (\(.) do.call(bind_rows,.))() |>
+    mutate(model="GAM", type="Presence-absence", species = sp, 
+           predictors = c("Full","Full w/o vessel","Optimal","Opt. w/o vessel",
+                          "No vessel opt."),
+           .before=1)
+}) |>
+  (\(.) do.call(bind_rows,.))()
+
+tt_gam = gam_pres.abs_stats |> select(!matches(".coeff$"),-dev.expl.perc,-v.dev.expl.perc) |>
+  mutate(type="pres.-abs.") |>
+  mutate(across(c(RMSE,MAE,v.RMSE,v.MAE),~ round(.x,2)),
+         species = crit_species[species],
+         across(c(well_classified,v.well_classified),~round(100*.x,1)),
+         across(AIC:mod.dev.expl.perc,~ round(.x,1))) |>
+  mutate(Model=paste(predictors,type,model),.after=species) |>
+  rename(Species=species,`well class. (%)`=well_classified,`v-RMSE`=v.RMSE,`v-MAE`=v.MAE,
+         `v-well class. (%)`=v.well_classified,`Dev. expl. (%)`=mod.dev.expl.perc) |>
+  select(-model,-type,-predictors)
+
+knitr::kable(tt_gam,row.names=FALSE,booktabs=TRUE,
+             caption="(ref:gammodelstats)") |>
+  kableExtra::kable_styling(latex_options="scale_down")
+```
+
+(ref:rfmodelstats) Performance statistics for the full and optimal presence-absence RF models of the four species considered in this study. Statistics preceded with "v-" (e.g., v-RMSE, v-MAE)
+were computed as the average over results from `r nfolds`-fold cross-validation.
+
+```{r rfmodelstats}
+fnb = "output_data/rf_pres.abs."
+
+rf_stats = lapply(names(crit_species), \(sp) {
+  fns = c(".full",".full_no_vessel",".optimal",".opt_no_vessel",".no_vessel_opt",".opt_gam_predictors")
+  fns = paste0(fnb,sp,fns,".RDS")
+
+  r = lapply(fns,\(.) model_results(readRDS(.))) |> (\(.) do.call(bind_rows,.))() |>
+    mutate(model="RF", type="Presence-absence", species = sp, 
+           predictors = c("Full","Full w/o vessel","Optimal","Opt. w/o vessel",
+                          "No vessel opt.","Opt. GAM predictors"),
+           .before=1)
+}) |>
+  (\(.) do.call(bind_rows,.))()
+
+tt_rf = rf_stats |>
+  
+  select(!matches(".coeff$"),-dev.expl.perc,-v.dev.expl.perc) |>
+  mutate(type="pres.-abs.") |>
+  mutate(across(c(RMSE,MAE,v.RMSE,v.MAE),~ round(.x,2)),
+         species = crit_species[species],
+         across(c(well_classified,v.well_classified),~round(100*.x,1)),
+         across(OOB.perc,~ round(.x,1))) |>
+  mutate(Model=paste(predictors,type,model,"model"),.after=species) |>
+  rename(Species=species,`well class. (%)`=well_classified,`v-RMSE`=v.RMSE,`v-MAE`=v.MAE,
+         `v-well class. (%)`=v.well_classified,`OOB err. (%)`=OOB.perc) |>
+  select(-model,-type,-predictors)
+
+knitr::kable(tt_rf,row.names=FALSE,booktabs=TRUE,
+             caption="(ref:rfmodelstats)",linesep=c('','','','','','\\addlinespace')) |>
+  kableExtra::kable_styling(latex_options="scale_down")
+
+```
+
+
+
+```{r rf_va_selection}
+fns = paste0("output_data/rf_pres.abs.",names(crit_species),".selection.RDS") |>
+  setNames(names(crit_species))
+rf_sel = lapply(fns,\(.) readRDS(.)$variables)
+
+fns = paste0("output_data/rf_pres.abs.",names(crit_species),".selection.no_vessel.RDS") |>
+  setNames(names(crit_species))
+rf_sel_no_vessel = lapply(fns,\(.) readRDS(.)$variables)
+```
+
+(ref:tblalloptrfmodsnovessel) Optimal presence-absence RF models for each of the four bycatch species in this study considering all predictors except "vessel". Optimal models were identified using the `VSURF` package.
+
+```{r tblalloptrfmodsnovessel}
+# Could include this table in the main text if we want to talk about optimization of all species
+rr = rf_sel_no_vessel |> sapply(\(.) as.character(sort(factor(.,levels=rf_terms))))
+tt = sapply(rr,paste0,collapse=" + ")
+tt = data.frame(Species = crit_species[names(tt)], mod=tt) |> mutate(mod=paste0("Pr(",Species,") ~ ",mod)) |>
+  rename(`No vessel optimal random forest presence-absence model`=mod)
+
+knitr::kable(tt,row.names=FALSE,booktabs=TRUE,
+             caption = "(ref:tblalloptrfmodsnovessel)")
+```
+
+(ref:gamabundfamilyqq) QQ-plots for general additive models (GAMs) of abundance of `r SP` when present in the bycatch of fishing sets. The distribution of residuals assumed in the model is indicated in the title of each panel.
+
+```{r gamabundfamilyqq,fig.cap="(ref:gamabundfamilyqq)",fig.asp=1.5,out.width="70%"}
+fns = paste0("output_data/gam_abund.",sp,".",names(gam_abund_families),".full.RDS")
+
+nr = ceiling(length(gam_abund_families)/2)
+op = par(mfrow = c(nr,2))
+
+for (ii in seq_along(fns)) {
+  fn = fns[ii]
+  mods = readRDS(fn)
+  ff = gam_abund_families[ii]
+  
+  mgcv::qq.gam(mods$model,main=paste0("QQ-plot of abundance GAM\nResiduals distribution=",ff))
+}
+
+par(op)
+```
+
+(ref:gamabundfamilyres) Residuals plotted as a function of predictions for general additive models (GAMs) of abundance of `r SP` when present in the bycatch of fishing sets. The distribution of residuals assumed in the model is indicated in the title of each panel. Pearson scaled residuals are shown (see the `residuals` function of the `mgcv` R package for more details). The lower dashed red curve, the middle solid red curve and the upper dashed red curve indicate the 25% quantile of the residuals, the mean of the residuals and the 75% quantile of the the residuals, respectively for each 10% quantile of the predictions.
+
+```{r gamabundfamilyres,fig.cap="(ref:gamabundfamilyres)",fig.asp=1.5,out.width="70%"}
+fns = paste0("output_data/gam_abund.",sp,".",names(gam_abund_families),".full.RDS")
+
+nr = ceiling(length(gam_abund_families)/2)
+op = par(mfrow = c(nr,2))
+
+for (ii in seq_along(fns)) {
+  fn = fns[ii]
+  mods = readRDS(fn)
+  ff = gam_abund_families[ii]
+  
+  p = predict(mods$model,type="response")
+  r = residuals(mods$model,type="scaled.pearson")
+  
+  d = tibble(Predictions=p,`Scaled Pearson residuals`=r)
+  q = quantile(p,p=seq(0,1,0.1))
+  q[1] = q[1] - 1e-5
+  d$cut = cut(d$Predictions,q)
+  
+  dd = d |> group_by(cut) |>
+    summarize(mn.pred=mean(Predictions),
+              mn = mean(`Scaled Pearson residuals`),
+              ll = quantile(`Scaled Pearson residuals`,probs=0.25),
+              ul = quantile(`Scaled Pearson residuals`,probs=0.75))
+  
+  plot(`Scaled Pearson residuals`~Predictions,data=d,pch=".",
+       main=paste0("Residuals vs. predicted for abundance GAM\nResiduals distribution=",ff))
+  lines(dd$mn.pred,dd$mn,col="red",lty="solid",lwd=2)
+  lines(dd$mn.pred,dd$ll,col="red",lty="dashed",lwd=2)
+  lines(dd$mn.pred,dd$ul,col="red",lty="dashed",lwd=2)
+  grid()
+}
+
+par(op)
+```
+
+```{r load_selection_gam_abund}
+gam_abund_sel = lapply(setNames(names(crit_species),names(crit_species)), \(sp) {
+  fn = paste0("output_data/gam_abund.",sp,".",chosen_gam_abund_family,".selection.RDS")
+  fnnv = paste0("output_data/gam_abund.",sp,".",chosen_gam_abund_family,".selection.no_vessel.RDS")
+  sel = readRDS(fn)$gam_selections
+  selnv = readRDS(fnnv)$gam_selections
+  
+  opt_terms = sel[[length(sel)]]$kept_terms
+  no_vessel_opt_terms = selnv[[length(selnv)]]$kept_terms
+  
+  return(list(opt_terms=opt_terms,no_vessel_opt_terms=no_vessel_opt_terms))
+})
+```
+
+(ref:tblalloptabundmodsnovessel) Optimal "abundance when present" `r tolower(gam_abund_families[chosen_gam_abund_family])` GAMs for each of the four bycatch species in this study considering all predictors except "vessel". Optimal models were identified by repeatedly removing the least significant (smoothed or parametric) predictor until all remaining predictors were significant at the 0.05 level. Each time a smoothed predictor was removed, the corresponding variable was then tested as a parametric predictor (i.e., without the smooth).
+
+```{r tblalloptabundmodsnovessel}
+# Could include this table in main text if we want to talk about optimization of all species
+tt = sapply(gam_abund_sel,\(.) .$no_vessel_opt_terms |> names() |> paste0(collapse=" + "))
+tt = data.frame(Species = tolower(crit_species[names(tt)]), mod=tt) |> 
+  mutate(mod=paste0("log(No. ",Species,") ~ ",mod)) |>
+  rename(`Optimal abundance GAM`=mod)
+
+knitr::kable(tt,row.names=FALSE,booktabs=TRUE,
+             caption="(ref:tblalloptabundmodsnovessel)") |>
+  kableExtra::kable_styling(latex_options="scale_down")
+```
+
+
+
+(ref:gamabundfulloptstats) Performance statistics for the full and optimal "abundance when present" `r tolower(gam_abund_families[chosen_gam_abund_family])` GAMs of the four species considered in this study. Models that are indicated as "full w/o vessel" and "opt. w/o vessel" were simply the same as the full and optimal models, respectively, with the predictor "vessel" removed, whereas "no vessel opt." models were optimized excluding the predictor "vessel" from the start. RMSE,
+MAE and deviance explained are the values computed with all data. v-RMSE, v-MAE and
+v-deviance explained were
+computed with `r nfolds`-fold cross-validation.
+Deviance explained was calculated using Eq. (1).
+
+```{r gamabundfulloptstats}
+fnb = "output_data/gam_abund."
+
+gam_abund_stats = lapply(names(crit_species), \(sp) {
+  fns = c(".full",".full_no_vessel",".optimal",".opt_no_vessel",".no_vessel_opt")
+  #fns = c(".full",".full_no_vessel",".optimal")#,".opt_no_vessel",".no_vessel_opt")
+  fns = paste0(fnb,sp,".",chosen_gam_abund_family,fns,".RDS")
+
+  r = lapply(fns,\(.) model_results(readRDS(.))) |> (\(.) do.call(bind_rows,.))() |>
+    mutate(model="GAM", type="Abundance", species = sp, family=chosen_gam_abund_family,
+           predictors = c("Full","Full w/o vessel","Optimal","Opt. w/o vessel","No vessel opt."),
+           .before=1)
+}) |>
+  (\(.) do.call(bind_rows,.))()
+
+tt_gam_abund = gam_abund_stats |> select(!matches(".coeff$"),-mod.dev.expl.perc) |>
+  mutate(type="abund.") |>
+  mutate(across(c(RMSE,MAE,v.RMSE,v.MAE),~ round(.x,2)),
+         species = crit_species[species],
+         across(c(dev.expl.perc,v.dev.expl.perc,AIC),~ round(.x,1))) |>
+  mutate(Model=paste(predictors,type,model),
+         Family=gam_abund_families[family],.after=species) |>
+  rename(Species=species,`v-RMSE`=v.RMSE,`v-MAE`=v.MAE,
+         `Dev. expl. (%)`=dev.expl.perc,`v-Dev. expl. (%)`=v.dev.expl.perc) |>
+  select(-model,-type,-predictors,-family)
+
+kableExtra::kbl(tt_gam_abund,row.names=FALSE,booktabs=TRUE,
+             caption="(ref:gamabundfulloptstats)") |>
+  kableExtra::kable_styling(latex_options="scale_down")
+```
+
+
+```{r prep_for_abund_effect_plots}
+gam_abund_mods = lapply(setNames(names(crit_species),names(crit_species)),
+                        \(sp) readRDS(paste0("output_data/gam_abund.",sp,".",chosen_gam_abund_family,".optimal.RDS")))
+
+res = lapply(gam_abund_mods,\(m){
+  gv=getViz(m$model) 
+  preds = m$preds
+  
+  # This code assumes that getViz output does not have outputs for direct terms
+  # I have not tested if this is always true
+  ot = names(preds)
+  tt = ot[grepl("(s|ti|te)[(]",ot)]
+  
+  ii = ifelse(grepl("quarter",tt),4,1) |> cumsum()
+  jj = grepl("(lon|lat)",tt)
+  
+  tt = tt[!jj]
+  ii = ii[!jj]
+  
+  TT = paste0("(",letters[seq_along(tt)],")")
+  ft = sub("lon [+] lat","lon,lat",flat_gam_terms[tt])
+  
+  FT = paste(TT,tt,collapse="; ")
+  
+  nrow = ceiling(length(tt)/3)
+  
+  return(list(gv=gv,preds=preds,ot=ot,tt=tt,TT=TT,ft=ft,FT=FT,nrow=nrow,ii=ii,model=m$model))
+})
+```
+
+(ref:figabundgameffect2) Marginal effect of non-spatial predictors with smooths on
+abundance when present of `r tolower(crit_species[names(res)[2]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal abundance GAM and are listed in the following order:
+`r res[[2]]$FT`. The horizontal red lines represent
+the central 95% of the distribution of the corresponding predictor
+variable.
+
+```{r figabundgameffect2, fig.cap="(ref:figabundgameffect2)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10/3*res[[2]]$nrow}
+rr = res[[2]]
+RR = lapply(seq_along(rr$tt), \(.) my_plot_gam_viz(rr$gv,rr$ii[.],rr$tt[.],rr$TT[.],fill_guide=TRUE))
+
+do.call(gridPrint,c(RR,ncol=3))
+```
+
+(ref:figabundgameffect3) Marginal effect of non-spatial predictors with smooths on
+abundance when present of `r tolower(crit_species[names(res)[3]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal abundance GAM and are listed in the following order:
+`r res[[3]]$FT`. The horizontal red lines represent
+the central 95% of the distribution of the corresponding predictor
+variable.
+
+```{r figabundgameffect3, fig.cap="(ref:figabundgameffect3)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10/3*res[[3]]$nrow}
+rr = res[[3]]
+RR = lapply(seq_along(rr$tt), \(.) my_plot_gam_viz(rr$gv,rr$ii[.],rr$tt[.],rr$TT[.],fill_guide=TRUE))
+
+do.call(gridPrint,c(RR,ncol=3))
+```
+
+(ref:figabundgameffect4) Marginal effect of non-spatial predictors with smooths on
+abundance when present of `r tolower(crit_species[names(res)[4]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal abundance GAM and are listed in the following order:
+`r res[[4]]$FT`. The horizontal red lines represent
+the central 95% of the distribution of the corresponding predictor
+variable.
+
+```{r figabundgameffect4, fig.cap="(ref:figabundgameffect4)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10/3*res[[4]]$nrow}
+rr = res[[4]]
+RR = lapply(seq_along(rr$tt), \(.) my_plot_gam_viz(rr$gv,rr$ii[.],rr$tt[.],rr$TT[.],fill_guide=TRUE))
+
+do.call(gridPrint,c(RR,ncol=3))
+```
+
+
+
+(ref:figabundgamlonlateffect2) Marginal effects of spatial predictors by quarter on the
+abundance when present of `r tolower(crit_species[names(res)[2]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for abundance using the `mgcv::vis.gam` function
+with all predictors other than lon, lat, quarter and month fixed at their median values.
+Month was set to be the central month of the corresponding quarter (e.g., for quarter 1, month was set to 2). 
+
+```{r figabundgamlonlateffect2, fig.cap="(ref:figabundgamlonlateffect2)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+rr = res[[2]]
+
+op = par(mfrow=c(2,2))
+
+for (q in 1:4){
+  my_plot_gam_geo_quarter(rr$model,quarter=q,main=paste0("(",letters[q],") Quarter ",q))
+}
+
+par(op)
+```
+
+
+(ref:figabundgamlonlateffect3) Marginal effects of spatial predictors by quarter on the
+abundance when present of `r tolower(crit_species[names(res)[3]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for abundance using the `mgcv::vis.gam` function
+with all predictors other than lon, lat, quarter and month fixed at their median values.
+Month was set to be the central month of the corresponding quarter (e.g., for quarter 1, month was set to 2). 
+
+```{r figabundgamlonlateffect3, fig.cap="(ref:figabundgamlonlateffect3)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+rr = res[[3]]
+
+op = par(mfrow=c(2,2))
+
+for (q in 1:4){
+  my_plot_gam_geo_quarter(rr$model,quarter=q,main=paste0("(",letters[q],") Quarter ",q))
+}
+
+par(op)
+```
+
+
+(ref:figabundgamlonlateffect4) Marginal effects of spatial predictors by quarter on the
+abundance when present of `r tolower(crit_species[names(res)[4]])` in floating objects fishing sets of the French PS
+fleet in the Indian Ocean. The effects were estimated with
+the optimal GAM for abundance using the `mgcv::vis.gam` function
+with all predictors other than lon, lat, quarter and month fixed at their median values.
+Month was set to be the central month of the corresponding quarter (e.g., for quarter 1, month was set to 2). 
+
+```{r figabundgamlonlateffect4, fig.cap="(ref:figabundgamlonlateffect4)", message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+rr = res[[4]]
+
+op = par(mfrow=c(2,2))
+
+for (q in 1:4){
+  my_plot_gam_geo_quarter(rr$model,quarter=q,main=paste0("(",letters[q],") Quarter ",q))
+}
+
+par(op)
+```
+
+
+(ref:deltafulloptstats) Performance statistics for the full and optimal $\Delta$ models of the four species considered in this study. Presence-absence was modeled using RF models, whereas abundance when present was modeled using `r tolower(gam_abund_families[chosen_gam_abund_family])` GAMs. Models that are indicated as "full w/o vessel" and "opt. w/o vessel" were simply the same as the full and optimal models, respectively, with the predictor "vessel" removed, whereas "no vessel opt." models were optimized excluding the predictor "vessel" from the start.  RMSE,
+MAE and deviance explained are the values computed with all data. v-RMSE, v-MAE and
+v-deviance explained were
+computed with `r nfolds`-fold cross-validation.
+Deviance explained was calculated using Eq. (1).
+
+```{r deltafulloptstats}
+fnb = "output_data/delta."
+
+delta_stats = lapply(names(crit_species), \(sp) {
+  fns = c(".full",".full_no_vessel",".optimal",".opt_no_vessel",".no_vessel_opt")
+  fns = paste0(fnb,sp,".rf.",chosen_gam_abund_family,fns,".RDS")
+
+  r = lapply(fns,\(.) model_results(readRDS(.))) |> (\(.) do.call(bind_rows,.))() |>
+    mutate(model="Delta", species = sp, family=chosen_gam_abund_family,
+           predictors = c("Full","Full w/o vessel","Optimal","Opt. w/o vessel",
+                          "No vessel opt."),
+           .before=1)
+}) |>
+  (\(.) do.call(bind_rows,.))()
+
+tt_delta = delta_stats |> select(!matches(".coeff$")) |>
+  mutate(across(c(RMSE,MAE,v.RMSE,v.MAE),~ round(.x,2)),
+         species = crit_species[species],
+         across(c(dev.expl.perc,v.dev.expl.perc),~ round(.x,1))) |>
+  mutate(Model=paste(predictors,gam_abund_families[family],"model"),.after=species) |>
+  rename(Species=species,`v-RMSE`=v.RMSE,`v-MAE`=v.MAE,
+         `Dev. expl. (%)`=dev.expl.perc,`v-Dev. expl. (%)`=v.dev.expl.perc) |>
+  select(-model,-family,-predictors)
+
+kableExtra::kbl(tt_delta,row.names=FALSE,booktabs=TRUE,
+             caption="(ref:deltafulloptstats)") |>
+  kableExtra::kable_styling(latex_options="scale_down")
+```
+
+<!-- Figures related to autocorrelation of residuals tests -->
+
+```{r deltaautocorr_data_prep, include=FALSE}
+ofns = paste0("output_data/autocorr.delta.",names(crit_species),".rf.",chosen_gam_abund_family,".optimal.RDS") |>
+  setNames(names(crit_species))
+
+my_plot_autocorr = function(res) {
+  ## Spatial
+  x = res$spatial
+  env_tot <- data.frame(bin = x$vario_obs$u, 
+                        v_obs = x$vario_obs$v,
+                        v_lower_obs = x$env_obs$v.lower,
+                        v_upper_obs = x$env_obs$v.upper,
+                        v_res = x$vario_res$v,
+                        v_lower_res = x$env_res$v.lower,
+                        v_upper_res = x$env_res$v.upper)
+
+  p2 <- ggplot(env_tot)+
+    geom_point(aes(x = bin, y = v_res), size = 1)+
+    geom_ribbon(aes(x = bin, ymin = v_lower_res, ymax = v_upper_res),
+                alpha = 0.3)+
+    labs(x = "Distance (decimal degrees)", y = "gamma")+
+    theme_bw()# +
+    #theme(text = element_text(size = 9))
+
+  ## Temporal
+  x = res$temporal
+  acf_df <- data.frame(mean_obs = colMeans(x$acf_obs),
+                       mean_res = colMeans(x$acf_res),
+                       lag = x$lag,
+                       se_obs = apply(X = x$acf_obs, MARGIN= 2,
+                                      FUN = function(x){sd(x)/ sqrt(length(x))}),
+                       se_res = apply(X = x$acf_res, MARGIN= 2,
+                                      FUN = function(x){sd(x)/ sqrt(length(x))}))
+
+  acf_df_long <- tidyr::pivot_longer(acf_df, cols = -lag,
+                                     names_to = c(".value","source"), names_sep = "_")
+  
+  p1 <- ggplot(data = acf_df_long, aes(x = lag, y = mean, fill= source)) +
+    geom_bar(stat = "identity", position = position_dodge2(), width = 0.9)+
+    geom_hline(yintercept = c(0, -1.96/sqrt(x$n_timestamps),
+                              1.96/sqrt(x$n_timestamps)),
+               linetype = c(1,2,2), colour = c("black", "blue", "blue"))+
+    geom_errorbar(aes(ymin = mean - 1.96*se, ymax = mean + 1.96*se, color = source), show.legend = FALSE,
+                  width = 0.3, linetype = 1, position = position_dodge(0.9))+
+    scale_fill_discrete(name = "Data", labels = c("Observation", "Residuals"))+
+    lims(y = c(-0.15,0.20))+
+    labs(x = "Lag (day)", y = "ACF")+
+    theme_bw() +
+    theme(legend.position="top")
+
+  ## Spatio-temporal
+  p3 = ggplot(res$spatiotemporal$variogram,aes(x=spacelag,y=timelag,fill=gamma)) + 
+    geom_raster() + scale_fill_continuous(type="viridis") + theme_bw() +
+    labs(x="Distance (km)",y="Time lag (days)")
+  
+  return(list(p1 + labs(title="(a)"), p2 + labs(title="(b)"), p3 + labs(title="(c)")))
+}
+```
+
+(ref:deltaautocorr1) Results of tests for autocorrelation in optimal $\Delta$ model residuals for bycatch of `r tolower(crit_species[1])`. Panel (a) shows the temporal autocorrelation function results for original observations (red) and residuals of the optimal $\Delta$ model (blue). Small whiskers on the bars indicate the extent of the 95% confidence interval for the estimate of cross-correlation at the given lag in days, and the dashed, horizontal, blue curve indicates the 95% confidence interval for significant cross-correlation. Note the absence of significant cross-correlations in the residuals. Panel (b) shows the spatial variogram of optimal $\Delta$ model residuals as a function of spatial separation in decimal degrees (one degree at the equator is ~111 km). The black dots indicate the estimate of gamma, whereas the gray area indicates the 95% confidence interval outside of which gamma would be considered significantly different from zero. Note that the estimates are always inside the gray area and, therefore, there is no significant spatial autocorrelation. Panel (c) shows gamma for a spatio-temporal variogram of optimal $\Delta$ model residuals as a function of spatial separation in km and temporal lag in days. Note the absence of a clear increase in gamma in the lower, left corner as would be expected if there were spatio-temporal autocorrelation in residuals.
+
+```{r deltaautocorr1, fig.cap="(ref:deltaautocorr1)",warning=FALSE,fig.asp=0.7}
+res = readRDS(ofns[names(crit_species)[1]])
+
+pp = my_plot_autocorr(res)
+do.call(gridPrint,c(pp,ncol=2))
+```
+
+(ref:deltaautocorr2) Results of tests for autocorrelation in optimal $\Delta$ model residuals for bycatch of `r tolower(crit_species[2])`. Panel (a) shows the temporal autocorrelation function results for original observations (red) and residuals of the optimal $\Delta$ model (blue). Small whiskers on the bars indicate the extent of the 95% confidence interval for the estimate of cross-correlation at the given lag in days, and the dashed, horizontal, blue curve indicates the 95% confidence interval for significant cross-correlation. Note the absence of significant cross-correlations in the residuals. Panel (b) shows the spatial variogram of optimal $\Delta$ model residuals as a function of spatial separation in decimal degrees (one degree at the equator is ~111 km). The black dots indicate the estimate of gamma, whereas the gray area indicates the 95% confidence interval outside of which gamma would be considered significantly different from zero. Note that the estimates are always inside the gray area and, therefore, there is no significant spatial autocorrelation. Panel (c) shows gamma for a spatio-temporal variogram of optimal $\Delta$ model residuals as a function of spatial separation in km and temporal lag in days. Note the absence of a clear increase in gamma in the lower, left corner as would be expected if there were spatio-temporal autocorrelation in residuals.
+
+```{r deltaautocorr2, fig.cap="(ref:deltaautocorr2)",warning=FALSE,fig.asp=0.7}
+res = readRDS(ofns[names(crit_species)[2]])
+
+pp = my_plot_autocorr(res)
+do.call(gridPrint,c(pp,ncol=2))
+```
+
+(ref:deltaautocorr3) Results of tests for autocorrelation in optimal $\Delta$ model residuals for bycatch of `r tolower(crit_species[3])`. Panel (a) shows the temporal autocorrelation function results for original observations (red) and residuals of the optimal $\Delta$ model (blue). Small whiskers on the bars indicate the extent of the 95% confidence interval for the estimate of cross-correlation at the given lag in days, and the dashed, horizontal, blue curve indicates the 95% confidence interval for significant cross-correlation. Note the absence of significant cross-correlations in the residuals. Panel (b) shows the spatial variogram of optimal $\Delta$ model residuals as a function of spatial separation in decimal degrees (one degree at the equator is ~111 km). The black dots indicate the estimate of gamma, whereas the gray area indicates the 95% confidence interval outside of which gamma would be considered significantly different from zero. Note that the estimates are always inside the gray area and, therefore, there is no significant spatial autocorrelation. Panel (c) shows gamma for a spatio-temporal variogram of optimal $\Delta$ model residuals as a function of spatial separation in km and temporal lag in days. Note the absence of a clear increase in gamma in the lower, left corner as would be expected if there were spatio-temporal autocorrelation in residuals.
+
+```{r deltaautocorr3, fig.cap="(ref:deltaautocorr3)",warning=FALSE,fig.asp=0.7}
+res = readRDS(ofns[names(crit_species)[3]])
+
+pp = my_plot_autocorr(res)
+do.call(gridPrint,c(pp,ncol=2))
+```
+
+(ref:deltaautocorr4) Results of tests for autocorrelation in optimal $\Delta$ model residuals for bycatch of `r tolower(crit_species[4])`. Panel (a) shows the temporal autocorrelation function results for original observations (red) and residuals of the optimal $\Delta$ model (blue). Small whiskers on the bars indicate the extent of the 95% confidence interval for the estimate of cross-correlation at the given lag in days, and the dashed, horizontal, blue curve indicates the 95% confidence interval for significant cross-correlation. Note the absence of significant cross-correlations in the residuals. Panel (b) shows the spatial variogram of optimal $\Delta$ model residuals as a function of spatial separation in decimal degrees (one degree at the equator is ~111 km). The black dots indicate the estimate of gamma, whereas the gray area indicates the 95% confidence interval outside of which gamma would be considered significantly different from zero. Note that the estimates are always inside the gray area and, therefore, there is no significant spatial autocorrelation. Panel (c) shows gamma for a spatio-temporal variogram of optimal $\Delta$ model residuals as a function of spatial separation in km and temporal lag in days. Note the absence of a clear increase in gamma in the lower, left corner as would be expected if there were spatio-temporal autocorrelation in residuals.
+
+```{r deltaautocorr4, fig.cap="(ref:deltaautocorr4)",warning=FALSE,fig.asp=0.7}
+res = readRDS(ofns[names(crit_species)[4]])
+
+pp = my_plot_autocorr(res)
+do.call(gridPrint,c(pp,ncol=2))
+```
+
+(ref:corrspecies) Spearman's rank cross-correlations of bycatch of the four study species. Spearman's correlations were used due to the non-normality of the data. Cross-correlations were carried out considering all FOB fishing sets for which observer data is available. In panel (a), cross-correlations were carried out using presence-absence data, where in (b), cross-correlations were carried out using bycatch abundance data including zeros.
+
+```{r corrspecies, fig.cap="(ref:corrspecies)",warning=FALSE}
+# Matrices for correlation
+data.abund = data_for_models_obs[, names(crit_species)]
+data.preabs = as.data.frame(data.abund > 0)
+
+# Make names pretty
+names(data.abund) = crit_species
+names(data.preabs) = crit_species
+
+# Correlations
+c.method="spearman"
+c.method.lab = expression(rho)
+c.abund = cor(data.abund, method = c.method)
+c.preabs = cor(data.preabs, method = c.method)
+
+# Test for significant correlations
+x = expand.grid(crit_species, crit_species)
+pval = apply(x, 1, function(x)
+  cor.test(data.abund[[x[1]]], data.abund[[x[2]]],method=c.method)$p.value)
+
+all.signif = all(pval < 0.05) # All true
+
+# Just keep lower triangle
+c.abund[!lower.tri(c.abund)] = NA
+c.preabs[!lower.tri(c.preabs)] = NA
+
+# Make longer
+c.abund.l = as.data.frame(c.abund) |>
+  rownames_to_column("Var1") |>
+  pivot_longer(-Var1, names_to = "Var2", values_to = "Correlation") |>
+  mutate(
+    Var1 = factor(Var1, levels = crit_species),
+    Var2 = factor(Var2, levels = crit_species)
+  ) |> filter(!is.na(Correlation))
+
+c.preabs.l = as.data.frame(c.preabs) |>
+  rownames_to_column("Var1") |>
+  pivot_longer(-Var1, names_to = "Var2", values_to = "Correlation") |>
+  mutate(
+    Var1 = factor(Var1, levels = crit_species),
+    Var2 = factor(Var2, levels = crit_species)
+  ) |> filter(!is.na(Correlation))
+
+# Make plot1
+f = function(x)
+  ggplot(x, aes(
+    x = Var1,
+    y = Var2,
+    label = round(Correlation, 2),
+    fill = Correlation
+  )) +
+  geom_tile(colour = "white") +
+  scale_fill_gradient(na.value = "white") +
+  geom_text(fontface = 2,
+            col = "white",
+            size = 3) +
+  ylab(NULL) + xlab(NULL) + labs(fill=c.method.lab) +
+  theme_classic() +
+  theme(text = element_text(size = 10),
+        axis.text.x = element_text(
+          angle = 40,
+          vjust = 1,
+          hjust = 1
+        ))
+
+p1 = f(c.abund.l) + labs(title="(b) Abund. cross-corr.")
+p2 = f(c.preabs.l) + labs(title="(a) Pres.-abs. cross-corr.")
+
+gridPrint(p2, p1,ncol=2)
+```
+
+(ref:predictperformancescales) Prediction performance statistics of the optimal 
+$\Delta$
+model for all four bycatch species at different scales of aggregation. 
+Presence-absence was modeled using RF models, whereas abundance when present was modeled using `r tolower(gam_abund_families[chosen_gam_abund_family])` GAMs.
+Panels on the left (a,c,e,g) present
+v-RMSE~norm~, i.e., the mean over the `r nfolds`-folds of the ratio
+of prediction RMSE to the mean prediction, whereas panels on the right (b,d,f,h) present
+v-MAE~norm~, i.e., the mean over the `r nfolds`-folds of the ratio
+of prediction MAE to the mean prediction. The four rows of the plot correspond to the four study species
+in the following order: `r paste0(tolower(crit_species)," (",letters[(seq_along(crit_species) - 1)*2 + 1],",",letters[(seq_along(crit_species) - 1)*2 + 2],")",collapse=", ")`.
+
+```{r load_predict_performance_scales}
+fn.pps = paste0("output_data/predict_performance_scales.rf.",chosen_gam_abund_family,".RDS")
+fn.pic = paste0("output_data/predit_int_calcs.rf.",chosen_gam_abund_family,".RData")
+predict_performance_scales = readRDS(fn.pps)
+```
+
+```{r predictperformancescales,fig.cap="(ref:predictperformancescales)",fig.width=10,fig.asp=4*0.5,out.height="8in"}
+plts = c(v.RMSE.coeff=expression(v-RMSE[norm]),v.MAE.coeff=expression(v-MAE[norm]))
+gg = lapply(names(crit_species),\(sp) {
+  lapply(names(plts),\(.){
+    ggplot(predict_performance_scales |> filter(species==sp), 
+           aes(x=spatial_name,y=temporal_name, fill=.data[[.]], label = round(.data[[.]],2))) +
+      geom_tile(color = "white") +
+      scale_fill_gradient(na.value = "white") +
+      geom_text(fontface = 2, col = "white", size = 3) +
+      ylab("Temporal stratification") + xlab("Spatial stratification") +
+      labs(fill = plts[.]) + theme_bw() +
+      theme(
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        plot.title = element_text(size = 10),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_blank()
+      )
+  })
+}) |> (\(.) do.call("c",.))()
+
+gg = lapply(seq_along(gg),\(.) gg[[.]] + labs(title=paste0("(",letters[.],")")))
+do.call(gridPrint,c(gg,ncol=2))
+```
+
