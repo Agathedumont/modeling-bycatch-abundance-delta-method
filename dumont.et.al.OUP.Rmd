@@ -6,8 +6,8 @@ author:
   - name: Agathe Dumont
     email: agathe.dumontpro@gmail.com
     affiliation:
+      - PHIM
       - MARBEC
-      - IRD
   - name: Antoine Duparc
     email: antoine.duparc@ird.fr
     affiliation:
@@ -30,6 +30,8 @@ address:
     address: MARBEC, Univ Montpellier, CNRS, Ifremer, IRD, Sète, France
   - code: IRD
     address: Institut de Recherche pour le Développement (IRD), av. Jean Monnet, CS3017, 34203 Sète Cédex, France
+  - code: PHIM
+    address: PHIM Plant Health Institute, CIRAD, INRAE, Institut Agro, IRD, University of Montpellier, Montpellier, France
 footnote:
   - code: corresp
     text: "Corresponding author. Email: david.kaplan@ird.fr"
@@ -2320,7 +2322,7 @@ period 1993-01-01 to 2020-12-31 (<https://doi.org/10.48670/moi-00019>, Accessed 
 
 ## Modeling bycatch rates with a $\Delta$ method
 
-(ref:conceptualoverview) A conceptual overview of our approach to modeling bycatch rates of the four target species. The approach is generic, but some of the information presented, such as the modeling appoaches and distribution families used to construct our final "optimal" $\Delta$ models used to predict bycatch rates represent results specific to this study. Fish illustrations \textcopyright L\'ea Ortega.
+(ref:conceptualoverview) A conceptual overview of our approach to modeling bycatch rates of the four target species. The approach is generic, but some of the information presented, such as the modeling appoaches and distribution families used to construct our final "optimal" $\Delta$ models used to predict bycatch rates represent results specific to this study. Fish illustrations \textcopyright Léa Ortega.
 
 ```{data conceptualimagedata, format = "binary", encoding = "base64", output.file = "conceptual-image-crop.pdf", echo = FALSE, md5sum = "56c47c4f63d755f916464d344442e268", eval=!file.exists("conceptual-image-crop.pdf")}
 JVBERi0xLjQKJdDUxdgKNCAwIG9iago8PAovTGVuZ3RoIDQxICAgICAgICAKL0Zp
@@ -6163,7 +6165,7 @@ tt = data.frame(Species = tolower(crit_species[names(tt)]), mod=tt) |>
   rename(`Optimal abundance GAM`=mod)
 
 xx = tt |> filter(Species=="common dolphinfish") |> pull(`Optimal abundance GAM`) |>
-  (\(.) gsub("+ ti[(]lon,lat,by=quarter[)]","\\\\\\\\ & ti(lon,lat,by=quarter)",gsub("+ s[(]MLD[)]","\\\\\\\\ & s(MLD)",gsub("^([^~]*) [~]","& \\\\text{\\1} \\\\sim \\\\\\\\ & ",.))))()
+  (\(.) gsub("+ ti[(]lon,lat,by=quarter[)]","\\\\\\\\ & \\\\quad ti(lon,lat,by=quarter)",gsub("+ s[(]MLD[)]","\\\\\\\\ & \\\\quad s(MLD)",gsub("^([^~]*) [~]","& \\\\text{\\1} \\\\sim \\\\\\\\ & \\\\quad ",.))))()
 
 
 ttt = mykable(tt,row.names=FALSE,booktabs=TRUE,
@@ -6742,14 +6744,9 @@ the best available approach to predicting total bycatch in tropical tuna
 fisheries with incomplete observer coverage. As such, we strongly encourage that
 this methodology be used for estimating bycatch levels for management and scientific purposes.
 
-# Data availability statement and reproducibility {.unnumbered}
+# Acknowledgments {.unnumbered}
 
-Given the confidential nature of the data used in this article, requests
-for data access should be addressed directly to the IRD's Exploited Tropical Pelagic Ecosystems Observatory (Ob7; <https://www.ob7.ird.fr/en/>) using the
-following e-mail address:
-[adm-dblp\@ird.fr](mailto:adm-dblp@ird.fr){.email}. Code for carrying out all analyses
-are available in open access at the following address:
-<https://github.com/Agathedumont/modeling-bycatch-abundance-delta-method>.
+We thank ORTHONGEL for making industry collected observer data via the OCUP observer program available for our analyses and the IRD-Ob7 pelagic observatory of the MARBEC laboratory for tropical tuna logbook and observer data management and preparation, particularly L. Floch. We thank the handling editor and three anonymous reviewers for their constructive comments that greatly improved the quality of the article.
 
 # Funding statement {.unnumbered}
 
@@ -6758,15 +6755,26 @@ IRD via support from the
 the European Data Collection Framework (DCF, Reg 199/2008 and 665/2008) and the French
 "Direction des Pêches Maritimes et de l'Aquaculture" (DPMA), as well as by the
 Horizon Europe project REDUCE (101135583).
-Data collection was financially supported by EU via the Data Collection Framework (DCF, Reg 199/2008 and 665/2008), and by ORTHONGEL in the framework of their OCUP program.
+Data collection was financially supported by the EU via the Data Collection Framework (DCF, Reg 199/2008 and 665/2008), and by ORTHONGEL in the framework of their OCUP program.
 
 # Competing interests {.unnumbered}
 
-There are no competing interest.
+The authors declare no competing interests.
 
-# Acknowledgments {.unnumbered}
+# Author contributions {.unnumbered}
 
-We thank ORTHONGEL for making industry collected observer data via the OCUP observer program available and the IRD-Ob7 pelagic observatory of the MARBEC laboratory for tropical tuna logbook and observer data management and preparation, particularly L. Floch. We thank the handling editor and three anonymous reviewers for their constructive comments that greatly improved the quality of the article.
+All authors contributed to designing the study. A. Dumont and D.M. Kaplan developed the methodology and analysed the data. All authors contributed to interpretation of the results. A. Dumont wrote the first draft of the paper, and all authors contributed to revisions.
+
+# Data availability statement and reproducibility {.unnumbered}
+
+The fine scale fishing activity, catch and bycatch data used in this article are confidential in nature and cannot be publicly shared. As such, requests
+for data access should be addressed directly to the IRD's Exploited Tropical Pelagic Ecosystems Observatory (Ob7; <https://www.ob7.ird.fr/en/>) using the
+following e-mail address:
+[adm-dblp\@ird.fr](mailto:adm-dblp@ird.fr){.email}. 
+
+Code for carrying out all analyses
+are available in open access at the following address:
+<https://github.com/Agathedumont/modeling-bycatch-abundance-delta-method>.
 
 # References {.unnumbered}
 
