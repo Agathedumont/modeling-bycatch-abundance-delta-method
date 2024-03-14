@@ -62,7 +62,7 @@ output:
     number_sections: TRUE # Uncomment to not number sections; default TRUE
     #number_lines: TRUE # Use `lineno` package - Default FALSE
     #number_lines_options: ["mathlines","switch"]  # Options for latex lineno package.
-    #onecolumn: TRUE # Uncomment for one column format; default FALSE
+    onecolumn: TRUE # Uncomment for one column format; default FALSE
     extra_dependencies:
       - booktabs # to use with knitr::kable() example below
 header-includes:
@@ -5968,7 +5968,7 @@ knitr::kable(tt,row.names=FALSE,booktabs=TRUE,
              caption = "(ref:tblalloptrfmods)")
 
 xx = tt |> pull(`Optimal random forest presence-absence model`) |>
-  (\(.) sub("Pr[(]([^)]*)[)]","\\\\text{Pr(\\1)}",gsub("[~]","\\\\sim &",sub("NPP [+]","NPP + \\\\\\\\ &",.))))() |>
+  (\(.) sub("Pr[(]([^)]*)[)]","\\\\text{Pr(\\1)}",gsub("[~]","\\\\sim & ",sub("NPP [+]","NPP +",.))))() |>
   paste0(collapse=" \\\\\n")
 ```
 
@@ -6165,7 +6165,7 @@ tt = data.frame(Species = tolower(crit_species[names(tt)]), mod=tt) |>
   rename(`Optimal abundance GAM`=mod)
 
 xx = tt |> filter(Species=="common dolphinfish") |> pull(`Optimal abundance GAM`) |>
-  (\(.) gsub("+ ti[(]lon,lat,by=quarter[)]","\\\\\\\\ & \\\\quad ti(lon,lat,by=quarter)",gsub("+ s[(]MLD[)]","\\\\\\\\ & \\\\quad s(MLD)",gsub("^([^~]*) [~]","& \\\\text{\\1} \\\\sim \\\\\\\\ & \\\\quad ",.))))()
+  (\(.) gsub("[+] ti[(]lon,lat,by=quarter[)]","+ \\\\\\\\ & ti(lon,lat,by=quarter)",gsub("[+] s[(]MLD[)]","+ \\\\\\\\ & s(MLD)",gsub("^([^~]*) [~]","\\\\text{\\1} \\\\sim & ",.))))()
 
 
 ttt = mykable(tt,row.names=FALSE,booktabs=TRUE,
